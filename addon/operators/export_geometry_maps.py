@@ -88,7 +88,7 @@ class EXPORT_OT_geometry_maps(bpy.types.Operator):
                         clip_end,
                     )
 
-                    # Same naming as the rendered images/ and transforms.json
+                    # Same naming as the rendered images/ and images.bin
                     name = f"{frame_idx:04d}.png"
                     if want_depth:
                         write_png(os.path.join(depths_dir, name), depth_png)

@@ -1,6 +1,6 @@
 ![Gauss Cannon Logo](gauss-cannon-logo.webp)
 
-> A powerful Blender add-on for Gaussian Splatting workflows. Generate your camera transforms and point clouds with ease!
+> A powerful Blender add-on for Gaussian Splatting workflows. Generate COLMAP camera models and point clouds with ease!
 
 [![Blender Version](https://img.shields.io/badge/Blender-5.0.0%2B-orange.svg)](https://www.blender.org/)
 [![License](https://img.shields.io/badge/License-GPL_v3.0-blue.svg)](LICENSE)
@@ -23,14 +23,9 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 - **Near Clipping Protection**: Automatically skips cameras too close to geometry
 
 ## Export Capabilities
-- **Multi-Format Camera Export**:
-  - LichtFeld Studio compatible format (default)
-  - Postshot compatible simplified format
-  - Brush compatible format (Z-up)
-  - COLMAP binary sparse model (`sparse/0/*.bin`), read by most Gaussian Splatting trainers
-- **Camera Parameters**: Exports full intrinsics and extrinsics with 4x4 transform matrices
-- **Scene Normalization**: Automatic AABB scale calculation for consistent processing
-- **Coordinate System Options**: Support for both Y-up and Z-up coordinate systems
+- **COLMAP Sparse Model**: Exports a binary COLMAP model (`sparse/0/*.bin`), which LichtFeld Studio, Brush, Postshot and other COLMAP-based trainers load directly
+- **Camera Parameters**: Pinhole intrinsics at the rendered image size and a pose for every rendered frame
+- **One Coordinate Frame**: Cameras and points stay in Blender's world frame, so no up-axis settings are needed
 
 ## Point Cloud Generation
 - **Ray-Traced Point Clouds**: Converts selected meshes to accurately-colored PLY point clouds
@@ -49,7 +44,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 
 ## User Interface
 - **Step-by-Step Workflow**: Clear Steps 1–4 guide you through the full pipeline
-- **Unified Output Folder**: Single folder for all exports (`transforms.json` or `sparse/0/`, `pointcloud.ply`, `images/`)
+- **Unified Output Folder**: Single folder for all exports (`sparse/0/`, `pointcloud.ply`, `images/`)
 - **Integrated Panel**: Clean UI in the 3D viewport's N-panel under "Gauss Cannon" tab
 - **Real-time Feedback**: Shows face counts, camera positions, and selected objects
 - **Visual Status Indicators**: Icons show mesh visibility and selection status
@@ -83,8 +78,6 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 ### 2. Configure Output
 ```
 1. Set the output folder (all exports go here)
-2. Choose export mode (LichtFeld Studio, Postshot, Brush or COLMAP)
-3. Select coordinate system (Y-up or Z-up; Brush and COLMAP always use Z-up)
 ```
 
 ### 3. Generate Camera Path (Step 1)
@@ -97,12 +90,12 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 
 ### 4. Export Camera Data
 ```
-1. Click "Export Camera JSON" (or "Export COLMAP Model" in COLMAP mode)
-2. transforms.json (or sparse/0/cameras.bin and images.bin) is saved to your output folder
+1. Click "Export COLMAP Model"
+2. sparse/0/cameras.bin and images.bin are saved to your output folder
 ```
 
-In COLMAP mode, "Generate Point Cloud" also writes `sparse/0/points3D.bin`, which
-trainers use to initialize the splats. Until then, the camera export leaves an empty
+"Generate Point Cloud" writes `sparse/0/points3D.bin`, which trainers use to
+initialize the splats. Until then, the camera export leaves an empty
 `points3D.bin` so the model is always loadable.
 
 ### 5. Generate Point Cloud
@@ -145,48 +138,6 @@ enough (Ray Density 32+, Stride 1). The panel warns when it isn't.
 
 # Technical Details
 
-## Camera JSON Export Formats
-
-### LichtFeld Studio Format
-```json
-{
-  "aabb_scale": 2.5,
-  "w": 1080,
-  "h": 1080,
-  "camera_angle_x": 0.6911,
-  "camera_angle_y": 0.6911,
-  "fl_x": 1388.88,
-  "fl_y": 1388.88,
-  "cx": 540.0,
-  "cy": 540.0,
-  "frames": [
-    {
-      "transform_matrix": [["..."]],
-      "file_path": "images/0001.png"
-    }
-  ]
-}
-```
-
-### Postshot Format
-```json
-{
-  "aabb_scale": 2.5,
-  "w": 1080,
-  "h": 1080,
-  "camera_angle_x": 0.6911,
-  "camera_angle_y": 0.6911,
-  "cx": 540.0,
-  "cy": 540.0,
-  "frames": [
-    {
-      "transform_matrix": [["..."]],
-      "file_path": "images/0001.png"
-    }
-  ]
-}
-```
-
 ## COLMAP Sparse Model
 Written to `sparse/0/` in COLMAP's binary format, next to `images/`:
 - **cameras.bin**: `PINHOLE` model (`fx, fy, cx, cy`) at the rendered image size, including the render resolution percentage. There is one camera unless the lens is animated.
@@ -195,9 +146,10 @@ Written to `sparse/0/` in COLMAP's binary format, next to `images/`:
 - **Coordinate System**: Blender's world frame (Z-up) for both cameras and points. COLMAP has no fixed up axis, and trainers orient the scene themselves.
 
 ## Point Cloud PLY Format
+`pointcloud.ply` holds the same points as `points3D.bin`:
 - **Format**: Binary little-endian PLY
 - **Properties**: x, y, z positions + RGB colors
-- **Coordinate System**: Configurable (Y-up or Z-up)
+- **Coordinate System**: Blender's world frame (Z-up), matching the COLMAP model
 - **Color Range**: 0-255 per channel
 
 ## Depth & Normal Map Format
@@ -294,7 +246,7 @@ This project is licensed under the GPL v3.0 License - see the [LICENSE](LICENSE)
 
 - Blender Foundation for Blender and the amazing Blender Python API
 - The Gaussian Splatting community for inspiration and feedback
-- The creators of LichtFeld Studio and PostShot
+- The creators of COLMAP, LichtFeld Studio, Brush and Postshot
 - All contributors and users of Gauss Cannon
 
 # Contact

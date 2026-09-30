@@ -38,7 +38,9 @@ actual feedback with `gh api repos/warpgatelabs/gauss-cannon/pulls/<N>/comments`
 
 ## Key Algorithms
 
-**Coordinate Conversion** (`utils/coordinate_systems.py`):
-- Blender uses Z-up; most external tools use Y-up
-- Matrix conversion: `conversion_matrix @ transform_matrix`
-- Point conversion: `[x, z, y]` for Y-up output
+**Coordinate frame** (`utils/colmap.py`): COLMAP is the only export. Cameras and
+points both stay in Blender's Z-up world frame, with no up-axis conversion
+(COLMAP has none, and trainers orient the scene themselves).
+- Poses are world-to-camera with OpenCV camera axes: right-multiply the Blender
+  camera matrix by `diag(1, -1, -1, 1)`, then invert
+- Depth/normal maps use the same OpenCV camera axes

@@ -26,7 +26,7 @@ def register_properties():
     # Shared output folder
     bpy.types.Scene.output_folder = bpy.props.StringProperty(
         name="Output Folder",
-        description="Folder for all exports (transforms.json or sparse/0/, pointcloud.ply, images/)",
+        description="Folder for all exports (sparse/0/, pointcloud.ply, images/)",
         default="",
         subtype="DIR_PATH",
         update=_update_pass_outputs,
@@ -57,32 +57,10 @@ def register_properties():
         precision=1,
     )
 
-    bpy.types.Scene.export_mode = bpy.props.EnumProperty(
-        name="Export Mode",
-        description="Choose export format compatibility",
-        items=[
-            ("LICHTFELD", "LichtFeld Studio", "Compatible with LichtFeld Studio"),
-            ("POSTSHOT", "Postshot", "Compatible with Postshot"),
-            ("BRUSH", "Brush", "Compatible with Brush"),
-            ("COLMAP", "COLMAP", "COLMAP binary sparse model (sparse/0/*.bin), read by most Gaussian Splatting trainers"),
-        ],
-        default="LICHTFELD",
-    )
-
     bpy.types.Scene.skip_interior_cameras = bpy.props.BoolProperty(
         name="Skip Interior Cameras",
         description="Skip camera positions detected to be inside meshes using ray casting",
         default=False,
-    )
-
-    bpy.types.Scene.coordinate_system = bpy.props.EnumProperty(
-        name="Coordinate System",
-        description="Output coordinate system for transforms and point cloud",
-        items=[
-            ("Y_UP", "Y-up", "Y-up coordinate system (Standard for most applications)"),
-            ("Z_UP", "Z-up", "Z-up coordinate system (Blender native)")
-        ],
-        default="Y_UP",
     )
 
     # Point cloud export settings
@@ -132,11 +110,9 @@ def unregister_properties():
     del bpy.types.Scene.output_width
     del bpy.types.Scene.output_height
     del bpy.types.Scene.camera_focal_length
-    del bpy.types.Scene.export_mode
     del bpy.types.Scene.pointcloud_resolution
     del bpy.types.Scene.use_gpu_acceleration
     del bpy.types.Scene.pointcloud_stride
     del bpy.types.Scene.skip_interior_cameras
-    del bpy.types.Scene.coordinate_system
     del bpy.types.Scene.export_depth_maps
     del bpy.types.Scene.export_normal_maps

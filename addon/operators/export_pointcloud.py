@@ -8,7 +8,7 @@ from ..utils.ray_casting import (
     cast_scene_rays,
     precompute_camera_rays,
 )
-from ..utils.coordinate_systems import output_coordinate_system, write_ply_bulk
+from ..utils.ply import write_ply_bulk
 from ..utils.colmap import SPARSE_FOLDER, write_points3d_bin
 
 
@@ -318,21 +318,18 @@ class EXPORT_OT_pointcloud_ply(bpy.types.Operator):
             os.makedirs(output_dir)
         output_path = os.path.join(output_dir, "pointcloud.ply")
 
-        coordinate_system = output_coordinate_system(scene)
         points = self._points_buf[: self._point_count]
         colors = self._colors_buf[: self._point_count]
-        write_ply_bulk(output_path, points, colors, coordinate_system)
+        write_ply_bulk(output_path, points, colors)
 
-        if scene.export_mode == "COLMAP":
-            # COLMAP trainers seed the splats from points3D.bin
-            sparse_dir = os.path.join(output_dir, SPARSE_FOLDER)
-            os.makedirs(sparse_dir, exist_ok=True)
-            write_points3d_bin(os.path.join(sparse_dir, "points3D.bin"), points, colors)
+        # COLMAP trainers seed the splats from points3D.bin
+        sparse_dir = os.path.join(output_dir, SPARSE_FOLDER)
+        os.makedirs(sparse_dir, exist_ok=True)
+        write_points3d_bin(os.path.join(sparse_dir, "points3D.bin"), points, colors)
 
-        coord_info = "Y-up" if coordinate_system == "Y_UP" else "Z-up"
         self.report(
             {"INFO"},
-            f"Generated {self._point_count} points from {self._total_frames} frames ({coord_info})",
+            f"Generated {self._point_count} points from {self._total_frames} frames",
         )
 
         self._release_state()
