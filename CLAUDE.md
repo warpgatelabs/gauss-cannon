@@ -30,15 +30,9 @@ GitHub Actions release build does not validate it, so these fail silently in CI:
 - `schema_version`: must be exactly `"1.0.0"` (the manifest format version, not
   the addon version)
 
-## PR reviews
-
-PRs get automatic line-level reviews from `gemini-code-assist[bot]`. Fetch the
-actual feedback with `gh api repos/warpgatelabs/gauss-cannon/pulls/<N>/comments`
-— `gh pr view <N> --comments` returns only the summary blurb.
-
 ## Key Algorithms
 
 **Coordinate Conversion** (`utils/coordinate_systems.py`):
 - Blender uses Z-up; most external tools use Y-up
 - Matrix conversion: `conversion_matrix @ transform_matrix`
-- Point conversion: `[x, z, y]` for Y-up output
+- Point conversion: `[x, z, -y]` for Y-up output
