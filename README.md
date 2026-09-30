@@ -42,6 +42,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 - **Integrated Rendering**: Render animation directly from the Gauss Cannon panel
 - **Engine Selection**: Choose render engine with Cycles-specific device and persistent data options
 - **Native Render Window**: Opens Blender's render progress window with ESC-to-cancel
+- **Render Farm Ready**: The render output path is stored relative to the saved .blend, so farm nodes write frames to the same `images/` folder
 
 ## User Interface
 - **Step-by-Step Workflow**: Clear Steps 1–4 guide you through the full pipeline
@@ -115,6 +116,10 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 3. Click "Render Animation"
 4. Frames are rendered to the images/ subfolder
 ```
+
+To render on a farm instead, save the .blend and submit it. The output path is
+stored relative to the .blend (e.g. `//output/images/`) whenever the file is saved,
+as long as the output folder is on the same drive.
 
 # Technical Details
 

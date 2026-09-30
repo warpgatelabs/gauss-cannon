@@ -6,6 +6,7 @@ from ..utils.ray_casting import (
     is_geometry_within_near_clip,
     build_visible_mesh_bvh_cache,
 )
+from ..utils.output_paths import sync_render_outputs
 
 
 class CAMERA_OT_generate_from_faces(bpy.types.Operator):
@@ -157,8 +158,7 @@ class CAMERA_OT_generate_from_faces(bpy.types.Operator):
         # Update render settings
         scene.render.resolution_x = scene.output_width
         scene.render.resolution_y = scene.output_height
-        output_dir = bpy.path.abspath(scene.output_folder)
-        scene.render.filepath = os.path.join(output_dir, "images", "")
+        sync_render_outputs(scene)
 
         # Report results
         if scene.skip_interior_cameras and rejected_cameras > 0:
@@ -199,7 +199,7 @@ class RENDER_OT_animation_to_export(bpy.types.Operator):
         if not os.path.exists(images_dir):
             os.makedirs(images_dir)
 
-        scene.render.filepath = os.path.join(images_dir, "")
+        sync_render_outputs(scene)
 
         # INVOKE_DEFAULT opens the render window with progress, like Render > Render Animation
         bpy.ops.render.render('INVOKE_DEFAULT', animation=True)

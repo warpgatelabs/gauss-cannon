@@ -2,6 +2,7 @@ import bpy
 
 # Import property classes and registration functions
 from .properties import HelperMeshItem, register_properties, unregister_properties
+from .utils.output_paths import register_handlers, unregister_handlers
 
 # Import all operators
 from .operators import (
@@ -45,9 +46,14 @@ def register():
     # Register scene properties
     register_properties()
 
+    # Keep render output paths relative to the .blend on save (render farms)
+    register_handlers()
+
 
 def unregister():
     """Unregister all addon classes and properties"""
+    unregister_handlers()
+
     # Unregister scene properties first
     unregister_properties()
 
