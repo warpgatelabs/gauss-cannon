@@ -32,8 +32,13 @@ def is_camera_inside_mesh(context, camera_pos, view_direction, helper_objects):
 
     # Check each mesh to see if camera is inside
     for obj in visible_meshes:
-        # Transform camera position to object space
-        mat_inv = obj.matrix_world.inverted()
+        # Transform camera position to object space. A mesh scaled to zero
+        # on any axis has no inverse and no volume, so it cannot contain
+        # the camera.
+        try:
+            mat_inv = obj.matrix_world.inverted()
+        except ValueError:
+            continue
         camera_pos_local = mat_inv @ camera_pos
 
         # Cast a ray in any direction (we'll use +X) to count intersections
@@ -298,8 +303,12 @@ def cast_ray_through_pixel(scene, camera, pixel_x, pixel_y, res_x, res_y, select
         if obj.type != "MESH":
             continue
 
-        # Transform ray to object space
-        obj_inv = obj.matrix_world.inverted()
+        # Transform ray to object space. A mesh scaled to zero on any axis
+        # has no inverse and no visible surface to hit.
+        try:
+            obj_inv = obj.matrix_world.inverted()
+        except ValueError:
+            continue
         ray_origin_obj = obj_inv @ ray_origin
         ray_dir_obj = obj_inv.to_3x3() @ ray_dir_world
         ray_dir_obj.normalize()
