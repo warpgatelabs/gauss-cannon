@@ -49,12 +49,13 @@ def register_properties():
     )
 
     bpy.types.Scene.camera_focal_length = bpy.props.FloatProperty(
-        name="Focal Length (mm)",
-        description="Camera lens focal length",
+        name="Focal Length",
+        description="Camera lens focal length in millimeters",
         default=35.0,
         min=1.0,
         max=500.0,
         precision=1,
+        subtype="DISTANCE_CAMERA",
     )
 
     bpy.types.Scene.skip_interior_cameras = bpy.props.BoolProperty(
@@ -89,14 +90,14 @@ def register_properties():
     # Depth/normal map export (rendered as compositor passes, then converted)
     bpy.types.Scene.export_depth_maps = bpy.props.BoolProperty(
         name="Depth Maps",
-        description="Also render depth maps (16-bit PNG in depths/) for depth-supervised training",
+        description="Also render depth maps (16-bit PNG in depths/) for depth-supervised training. Adds a depth pass output to the scene's compositor",
         default=False,
         update=_update_pass_outputs,
     )
 
     bpy.types.Scene.export_normal_maps = bpy.props.BoolProperty(
         name="Normal Maps",
-        description="Also render camera-space normal maps (PNG in normals/) for normal-supervised training",
+        description="Also render camera-space normal maps (PNG in normals/) for normal-supervised training. Adds a normal pass output to the scene's compositor",
         default=False,
         update=_update_pass_outputs,
     )

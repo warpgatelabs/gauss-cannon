@@ -43,7 +43,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 - **Depth & Normal Maps**: Optional exact depth and camera-space normal maps for depth/normal-supervised training in LichtFeld Studio and Spirula Studio
 
 ## User Interface
-- **Step-by-Step Workflow**: Clear Steps 1–4 guide you through the full pipeline
+- **Step-by-Step Workflow**: Collapsible Steps 1–4 guide you through the full pipeline
 - **Unified Output Folder**: Single folder for all exports (`sparse/0/`, `pointcloud.ply`, `images/`)
 - **Integrated Panel**: Clean UI in the 3D viewport's N-panel under "Gauss Cannon" tab
 - **Real-time Feedback**: Shows face counts, camera positions, and selected objects
@@ -78,38 +78,33 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 ### 2. Configure Output
 ```
 1. Set the output folder (all exports go here)
+2. Optionally tick "Depth Maps" and/or "Normal Maps" under "Also Render"
 ```
 
 ### 3. Generate Camera Path (Step 1)
 ```
 1. Configure focal length, resolution, and interior camera detection
-2. Click "Generate Cameras"
-3. Cameras are created at each face center
+2. Click "Generate Camera Path"
+3. The active camera is keyframed at each face center (its existing
+   animation is replaced)
 4. Timeline and render settings are updated automatically
 ```
 
-### 4. Export Camera Data
+### 4. Generate Point Cloud (Step 2)
 ```
-1. Click "Export COLMAP Model"
-2. sparse/0/cameras.bin and images.bin are saved to your output folder
-```
-
-"Generate Point Cloud" writes `sparse/0/points3D.bin`, which trainers use to
-initialize the splats. Until then, the camera export leaves an empty
-`points3D.bin` so the model is always loadable.
-
-### 5. Generate Point Cloud
-```
-1. Select target meshes in the viewport (excluding helper meshes)
+1. Select target meshes in the viewport (helper meshes are ignored)
 2. Configure settings:
-   - Ray Density: 4-1024 (default: 8)
+   - Ray Density: 4-1024 (default: 8), the side of an NxN ray grid per frame
    - Stride: Use every Nth frame (default: 1)
    - GPU acceleration: Enable for faster processing
 3. Click "Generate Point Cloud"
-4. pointcloud.ply is saved to your output folder
+4. pointcloud.ply and sparse/0/points3D.bin are saved to your output folder
 ```
 
-### 6. Render Animation
+The panel shows the rays per frame and the maximum number of points the
+current settings can produce.
+
+### 5. Render Animation (Step 3)
 ```
 1. Choose render engine (Cycles/EEVEE)
 2. For Cycles: select device and persistent data options
@@ -121,20 +116,33 @@ To render on a farm instead, save the .blend and submit it. The output path is
 stored relative to the .blend (e.g. `//output/images/`) whenever the file is saved,
 as long as the output folder is on the same drive.
 
+### 6. Export COLMAP Model (Step 4)
+```
+1. Click "Export COLMAP Model"
+2. sparse/0/cameras.bin and images.bin are saved to your output folder
+```
+
+This is the last step because the model records the rendered image size and
+file extension from the render settings. Re-run it if you change those.
+Until "Generate Point Cloud" has run, the export leaves an empty
+`sparse/0/points3D.bin` so the model is always loadable; it never overwrites
+an existing one.
+
 ### 7. Depth & Normal Maps (optional)
 ```
-1. In Step 4, enable "Depth Maps" and/or "Normal Maps"
+1. Under "Output", tick "Depth Maps" and/or "Normal Maps"
 2. Click "Render Animation": passes are saved as EXRs in _passes/, then
    converted to depths/ and normals/ PNGs when the render finishes
 ```
 
 The pass setup is saved in the .blend (view-layer passes plus compositor File
 Output nodes), so a render farm produces the `_passes/` EXRs without the add-on
-installed. After the farm finishes, click "Convert Depth/Normal Passes".
-Turning both toggles off removes the compositor nodes again.
+installed. After the farm finishes, click "Convert Rendered Passes".
+Unticking both removes the compositor nodes again.
 
 For depth supervision in LichtFeld Studio, the point cloud also needs to be dense
-enough (Ray Density 32+, Stride 1). The panel warns when it isn't.
+enough: at least 1024 rays per frame (Ray Density 32+). The panel warns when it
+isn't.
 
 # Technical Details
 

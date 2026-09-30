@@ -1,8 +1,29 @@
 import bpy
 from ..operators.export_geometry_maps import conversion_progress
+from ..operators.export_pointcloud import scannable_meshes
 
 
 VERSION = "1.2.0"
+
+# Below this many rays per frame the point cloud is too sparse for depth
+# priors (LichtFeld Studio skips depth supervision for cameras with too few
+# projected points)
+MIN_RAYS_PER_FRAME_FOR_DEPTH = 1024
+
+
+def _plural(count, noun):
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+
+
+def _helper_face_count(item):
+    """Face count of a helper mesh, or None if its object is unusable."""
+    try:
+        obj = item.mesh_object
+        if obj and obj.type == "MESH" and obj.data:
+            return len(obj.data.polygons)
+    except (AttributeError, ReferenceError):
+        pass
+    return None
 
 
 class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
@@ -16,146 +37,173 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
+        # Blender's property-panel style: label column on the left, values on
+        # the right, no animation decorators
+        layout.use_property_split = True
+        layout.use_property_decorate = False
         scene = context.scene
 
-        # Helper mesh section
-        box = layout.box()
-        row = box.row()
-        row.label(text="Helper Meshes", icon="OUTLINER_OB_MESH")
-        if len(scene.helper_meshes) > 0:
-            total_faces = 0
-            for item in scene.helper_meshes:
-                try:
-                    if item.mesh_object and item.mesh_object.type == 'MESH' and item.mesh_object.data:
-                        total_faces += len(item.mesh_object.data.polygons)
-                except (AttributeError, ReferenceError):
-                    pass
-            row.label(text=f"{len(scene.helper_meshes)} meshes, {total_faces} faces")
-
-        row = box.row(align=True)
-        row.operator("mesh.add_helper", text="Add Selected", icon="ADD")
-        row.operator("mesh.clear_helpers", text="Clear All", icon="TRASH")
-
-        if len(scene.helper_meshes) > 0:
-            col = box.column(align=True)
-            for i, item in enumerate(scene.helper_meshes):
-                row = col.row(align=True)
-
-                if item.mesh_object is None:
-                    row.label(text=f"{item.name} (Missing)", icon="ERROR")
-                else:
-                    try:
-                        obj_type = item.mesh_object.type
-                        if obj_type == 'MESH' and item.mesh_object.data:
-                            icon = "OUTLINER_OB_MESH" if item.mesh_object.visible_get() else "HIDE_ON"
-                            face_count = len(item.mesh_object.data.polygons)
-                            row.label(text=f"{item.name} ({face_count})", icon=icon)
-                        else:
-                            row.label(text=f"{item.name} (Invalid)", icon="ERROR")
-                    except (AttributeError, ReferenceError):
-                        row.label(text=f"{item.name} (Not loaded)", icon="ERROR")
-
-                op = row.operator("mesh.remove_helper", text="", icon="X")
-                op.index = i
-        else:
-            col = box.column()
-            col.label(text="No helper meshes added")
-            col.label(text="Select mesh objects and click 'Add Selected'", icon="INFO")
-
-        # Output folder
-        box = layout.box()
-        box.label(text="Output", icon="FILE_FOLDER")
-        col = box.column(align=True)
-        col.prop(scene, "output_folder")
+        self.draw_helper_meshes(layout, scene)
+        self.draw_output(layout, scene)
 
         if not scene.output_folder.strip():
             layout.label(text="Set an output folder to continue", icon="INFO")
             return
 
-        # Step 1: Camera Generation
-        box = layout.box()
-        box.label(text="Step 1: Camera Generation", icon="CAMERA_DATA")
+        # COLMAP export comes last: it records the image file extension and
+        # resolution percentage from the render settings, so it must run
+        # after those are final
+        self.draw_camera_path(layout, scene)
+        self.draw_point_cloud(layout, context)
+        self.draw_render(layout, scene)
+        self.draw_colmap(layout)
 
-        col = box.column(align=True)
-        col.prop(scene, "camera_focal_length")
-        row = col.row(align=True)
-        row.prop(scene, "output_width")
-        row.prop(scene, "output_height")
-        col.prop(scene, "skip_interior_cameras")
+    def draw_helper_meshes(self, layout, scene):
+        header, body = layout.panel("gauss_cannon_helper_meshes")
+        items = scene.helper_meshes
+        title = "Helper Meshes"
+        if len(items) > 0:
+            faces = sum(_helper_face_count(item) or 0 for item in items)
+            # One label: two in a header split the width evenly and truncate
+            title += f" ({_plural(faces, 'camera')})"
+        header.label(text=title, icon="OUTLINER_OB_MESH")
+        if body is None:
+            return
 
-        col.separator()
-        col.scale_y = 1.3
-        col.operator("camera.generate_from_faces", text="Generate Cameras", icon="CAMERA_DATA")
+        row = body.row(align=True)
+        row.operator("mesh.add_helper", text="Add Selected", icon="ADD")
+        row.operator("mesh.clear_helpers", text="Clear All", icon="TRASH")
 
-        # Step 2: Camera Export
-        box = layout.box()
-        box.label(text="Step 2: Camera Export", icon="EXPORT")
+        if len(items) == 0:
+            col = body.column(align=True)
+            col.label(text="One camera per face, looking in", icon="INFO")
+            col.label(text="Select a mesh, then Add Selected")
+            return
 
-        col = box.column(align=True)
-        col.scale_y = 1.3
-        col.operator("export.colmap", text="Export COLMAP Model", icon="FILE_3D")
+        col = body.column(align=True)
+        for i, item in enumerate(items):
+            row = col.row(align=True)
+            if item.mesh_object is None:
+                row.label(text=f"{item.name} (Missing)", icon="ERROR")
+            else:
+                face_count = _helper_face_count(item)
+                if face_count is None:
+                    row.label(text=f"{item.name} (Invalid)", icon="ERROR")
+                else:
+                    try:
+                        visible = item.mesh_object.visible_get()
+                    except (AttributeError, ReferenceError):
+                        visible = True
+                    icon = "OUTLINER_OB_MESH" if visible else "HIDE_ON"
+                    row.label(text=f"{item.name} ({face_count})", icon=icon)
+            op = row.operator("mesh.remove_helper", text="", icon="X")
+            op.index = i
 
-        # Step 3: Point Cloud
-        box = layout.box()
-        box.label(text="Step 3: Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
+    def draw_output(self, layout, scene):
+        header, body = layout.panel("gauss_cannon_output")
+        header.label(text="Output", icon="FILE_FOLDER")
+        if body is None:
+            return
 
-        selected_meshes = [
-            obj for obj in context.selected_objects if obj.type == "MESH"
-        ]
+        body.prop(scene, "output_folder")
 
-        col = box.column(align=True)
+        # Same layout Blender uses for view layer passes: a heading with
+        # independent checkboxes, so both can be on at once
+        col = body.column(heading="Also Render", align=True)
+        col.prop(scene, "export_depth_maps")
+        col.prop(scene, "export_normal_maps")
+
+    def draw_camera_path(self, layout, scene):
+        header, body = layout.panel("gauss_cannon_camera_path")
+        header.label(text="Step 1: Camera Path", icon="CAMERA_DATA")
+        if body is None:
+            return
+
+        body.prop(scene, "camera_focal_length")
+        col = body.column(align=True)
+        col.prop(scene, "output_width", text="Resolution X")
+        col.prop(scene, "output_height", text="Y")
+        col = body.column(heading="Cameras")
+        col.prop(scene, "skip_interior_cameras", text="Skip Interior")
+
+        row = body.row()
+        row.scale_y = 1.3
+        row.operator("camera.generate_from_faces", text="Generate Camera Path", icon="CAMERA_DATA")
+
+    def draw_point_cloud(self, layout, context):
+        scene = context.scene
+        header, body = layout.panel("gauss_cannon_point_cloud")
+        header.label(text="Step 2: Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
+        if body is None:
+            return
+
+        col = body.column(align=True)
         col.prop(scene, "pointcloud_resolution")
         col.prop(scene, "pointcloud_stride")
-        col.prop(scene, "use_gpu_acceleration")
+        body.prop(scene, "use_gpu_acceleration", text="GPU Acceleration")
 
-        col.separator()
-        col.scale_y = 1.3
-        col.operator("export.pointcloud_ply", text="Generate Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
+        # Ray Density is the side of an NxN grid, which is easy to misread
+        rays_per_frame = scene.pointcloud_resolution ** 2
+        frames = len(range(scene.frame_start, scene.frame_end + 1, scene.pointcloud_stride))
+        col = body.column(align=True)
+        col.label(text=f"{rays_per_frame:,} rays per frame", icon="INFO")
+        col.label(text=f"Up to {rays_per_frame * frames:,} points")
+        if scene.export_depth_maps and rays_per_frame < MIN_RAYS_PER_FRAME_FOR_DEPTH:
+            col.label(text="Too sparse for depth priors", icon="ERROR")
+            col.label(text="Use Ray Density 32+")
 
-        # LichtFeld Studio fits depth priors to the point cloud and needs
-        # 256+ points projecting into each camera, or skips depth supervision
-        if scene.export_depth_maps and (
-            scene.pointcloud_resolution < 32 or scene.pointcloud_stride > 1
-        ):
-            box.label(text="Too sparse for depth priors", icon="ERROR")
-            box.label(text="Use Ray Density 32+ and Stride 1")
+        row = body.row()
+        row.scale_y = 1.3
+        row.operator("export.pointcloud_ply", text="Generate Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
 
-        if selected_meshes:
-            box.label(text=f"{len(selected_meshes)} mesh(es) selected", icon="CHECKMARK")
+        # Same filter as the operator, so the count never promises a run
+        # the operator would refuse
+        selected = scannable_meshes(context)
+        if selected:
+            body.label(text=f"{_plural(len(selected), 'mesh')} selected", icon="CHECKMARK")
         else:
-            box.label(text="Select the meshes to scan in the viewport", icon="INFO")
+            body.label(text="Select the meshes to scan", icon="INFO")
 
-        # Step 4: Render Animation
-        box = layout.box()
-        box.label(text="Step 4: Render Animation", icon="RENDER_ANIMATION")
+    def draw_render(self, layout, scene):
+        header, body = layout.panel("gauss_cannon_render")
+        header.label(text="Step 3: Render Animation", icon="RENDER_ANIMATION")
+        if body is None:
+            return
 
-        col = box.column(align=True)
-        col.prop(scene.render, "engine")
+        body.prop(scene.render, "engine")
         if scene.render.engine == 'CYCLES':
-            col.prop(scene.cycles, "device")
-            col.prop(scene.render, "use_persistent_data")
+            body.prop(scene.cycles, "device")
+            body.prop(scene.render, "use_persistent_data")
 
-        col.separator()
-        row = col.row(align=True)
-        row.prop(scene, "export_depth_maps", toggle=True)
-        row.prop(scene, "export_normal_maps", toggle=True)
         maps_enabled = scene.export_depth_maps or scene.export_normal_maps
-        if maps_enabled and scene.render.engine == "BLENDER_WORKBENCH":
-            col.label(text="Maps need Cycles or EEVEE", icon="ERROR")
+        workbench_blocked = maps_enabled and scene.render.engine == "BLENDER_WORKBENCH"
+        if workbench_blocked:
+            body.label(text="Maps need Cycles or EEVEE", icon="ERROR")
 
-        col.separator()
-        col.scale_y = 1.3
-        col.operator("render.animation_to_export", text="Render Animation", icon="RENDER_ANIMATION")
+        row = body.row()
+        row.scale_y = 1.3
+        row.enabled = not workbench_blocked
+        row.operator("render.animation_to_export", text="Render Animation", icon="RENDER_ANIMATION")
 
         progress = conversion_progress()
         if progress is not None:
             fraction, label = progress
-            row = box.row(align=True)
+            row = body.row(align=True)
             row.progress(factor=fraction, type="BAR", text=label)
             row.operator("export.geometry_maps_cancel", text="", icon="X")
         elif maps_enabled:
-            col = box.column(align=True)
-            col.operator("export.geometry_maps", text="Convert Depth/Normal Passes", icon="IMAGE_DATA")
-            box.label(text="Auto-runs after Render Animation", icon="INFO")
-            box.label(text="Run manually after farm renders")
+            # Render Animation converts the passes itself; this is for
+            # frames rendered elsewhere
+            col = body.column(align=True)
+            col.operator("export.geometry_maps", text="Convert Rendered Passes", icon="IMAGE_DATA")
+            col.label(text="Only needed for farm renders", icon="INFO")
 
+    def draw_colmap(self, layout):
+        header, body = layout.panel("gauss_cannon_colmap")
+        header.label(text="Step 4: Export COLMAP", icon="EXPORT")
+        if body is None:
+            return
+
+        row = body.row()
+        row.scale_y = 1.3
+        row.operator("export.colmap", text="Export COLMAP Model", icon="FILE_3D")

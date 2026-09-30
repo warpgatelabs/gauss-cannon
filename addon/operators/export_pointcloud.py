@@ -12,6 +12,29 @@ from ..utils.ply import write_ply_bulk
 from ..utils.colmap import SPARSE_FOLDER, write_points3d_bin
 
 
+def helper_mesh_objects(scene):
+    """Objects registered as helper meshes (skipping stale references)."""
+    objects = set()
+    for item in scene.helper_meshes:
+        try:
+            if item.mesh_object:
+                objects.add(item.mesh_object)
+        except (AttributeError, ReferenceError):
+            pass
+    return objects
+
+
+def scannable_meshes(context):
+    """Selected mesh objects the point cloud is cast against: helper meshes
+    are excluded, since they only define camera positions."""
+    helpers = helper_mesh_objects(context.scene)
+    return [
+        obj
+        for obj in context.selected_objects
+        if obj.type == "MESH" and obj not in helpers
+    ]
+
+
 class EXPORT_OT_pointcloud_ply(bpy.types.Operator):
     """Generate colored point cloud in PLY format from selected objects"""
 
@@ -45,8 +68,7 @@ class EXPORT_OT_pointcloud_ply(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return (
-            context.selected_objects
-            and any(obj.type == "MESH" for obj in context.selected_objects)
+            scannable_meshes(context)
             and context.scene.camera
             and context.scene.frame_end >= context.scene.frame_start
             and context.scene.output_folder.strip()
@@ -124,21 +146,7 @@ class EXPORT_OT_pointcloud_ply(bpy.types.Operator):
         scene = context.scene
         self._resolution = scene.pointcloud_resolution
 
-        # Get selected mesh objects, excluding helper meshes
-        helper_mesh_objects = set()
-        for item in scene.helper_meshes:
-            try:
-                if item.mesh_object:
-                    helper_mesh_objects.add(item.mesh_object)
-            except (AttributeError, ReferenceError):
-                pass
-
-        self._selected_meshes = [
-            obj
-            for obj in context.selected_objects
-            if obj.type == "MESH" and obj not in helper_mesh_objects
-        ]
-
+        self._selected_meshes = scannable_meshes(context)
         if not self._selected_meshes:
             self.report(
                 {"ERROR"}, "No mesh objects selected (helper meshes are excluded)"

@@ -11,10 +11,12 @@ from .export_geometry_maps import conversion_progress
 
 
 class CAMERA_OT_generate_from_faces(bpy.types.Operator):
-    """Generate camera keyframes from helper mesh faces"""
+    """Keyframe the active camera at every helper mesh face, facing inward.
+    Replaces the camera's existing animation and lens, and sets the frame range
+    and render resolution"""
 
     bl_idname = "camera.generate_from_faces"
-    bl_label = "Generate Camera Keyframes"
+    bl_label = "Generate Camera Path"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod

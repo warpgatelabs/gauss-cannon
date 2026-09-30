@@ -213,7 +213,7 @@ class EXPORT_OT_geometry_maps(bpy.types.Operator):
     """Convert rendered depth/normal passes (EXR) into depths/ and normals/ PNGs"""
 
     bl_idname = "export.geometry_maps"
-    bl_label = "Convert Depth/Normal Passes"
+    bl_label = "Convert Rendered Passes"
     bl_options = {"REGISTER"}
 
     @classmethod
