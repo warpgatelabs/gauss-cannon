@@ -1,6 +1,7 @@
 import os
 import bpy
 from bpy.app.handlers import persistent
+from . import compositor_passes
 
 
 def to_blend_relative(path, blend_path=None):
@@ -40,8 +41,19 @@ def images_render_path(scene, blend_path=None):
 
 
 def sync_render_outputs(scene, blend_path=None):
-    """Point the scene's render output at <output_folder>/images/."""
+    """Point the scene's render output at <output_folder>/images/ and the
+    depth/normal pass outputs at <output_folder>/_passes/."""
     scene.render.filepath = images_render_path(scene, blend_path)
+    sync_pass_outputs(scene, blend_path)
+
+
+def sync_pass_outputs(scene, blend_path=None):
+    """Create, update or remove the compositor depth/normal pass outputs."""
+    passes_dir = to_blend_relative(
+        os.path.join(scene.output_folder, compositor_passes.PASSES_FOLDER, ""),
+        blend_path,
+    )
+    compositor_passes.apply(scene, passes_dir)
 
 
 def _renders_to_images_folder(scene):
@@ -54,31 +66,41 @@ def _renders_to_images_folder(scene):
     )
 
 
-# Scenes whose render path was rewritten in save_pre, re-synced in save_post
+# (scene name, render path synced, passes synced) from save_pre, for save_post
 _synced_on_save = []
+
+
+def _sync_for_save(scene, sync_render, sync_passes, blend_path=None):
+    if sync_render:
+        scene.render.filepath = images_render_path(scene, blend_path)
+    if sync_passes:
+        sync_pass_outputs(scene, blend_path)
 
 
 @persistent
 def on_save_pre(filepath="", *args):
-    """Make render paths relative to the .blend being written, including its
-    first save and Save As, so the saved file works on a render farm."""
+    """Make render and pass paths relative to the .blend being written,
+    including its first save and Save As, so it works on a render farm."""
     _synced_on_save.clear()
     if not isinstance(filepath, str) or not filepath:
         return
     for scene in bpy.data.scenes:
-        if scene.output_folder.strip() and _renders_to_images_folder(scene):
-            sync_render_outputs(scene, blend_path=filepath)
-            _synced_on_save.append(scene.name)
+        if not scene.output_folder.strip():
+            continue
+        sync_render = _renders_to_images_folder(scene)
+        sync_passes = compositor_passes.maps_enabled(scene)
+        _sync_for_save(scene, sync_render, sync_passes, blend_path=filepath)
+        _synced_on_save.append((scene.name, sync_render, sync_passes))
 
 
 @persistent
 def on_save_post(*args):
     """Save Copy leaves the session on the original .blend, so re-derive the
     paths against it; for a regular save this is a no-op."""
-    for name in _synced_on_save:
+    for name, sync_render, sync_passes in _synced_on_save:
         scene = bpy.data.scenes.get(name)
         if scene is not None:
-            sync_render_outputs(scene)
+            _sync_for_save(scene, sync_render, sync_passes)
     _synced_on_save.clear()
 
 

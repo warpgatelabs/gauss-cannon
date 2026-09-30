@@ -1,4 +1,5 @@
 import bpy
+from .utils.output_paths import sync_pass_outputs
 
 
 class HelperMeshItem(bpy.types.PropertyGroup):
@@ -9,6 +10,11 @@ class HelperMeshItem(bpy.types.PropertyGroup):
         poll=lambda self, obj: obj.type == "MESH",
     )
     name: bpy.props.StringProperty(name="Name")
+
+
+def _update_pass_outputs(self, context):
+    """Keep the compositor depth/normal outputs in step with the settings."""
+    sync_pass_outputs(self)
 
 
 def register_properties():
@@ -23,6 +29,7 @@ def register_properties():
         description="Folder for all exports (transforms.json, pointcloud.ply, images/)",
         default="",
         subtype="DIR_PATH",
+        update=_update_pass_outputs,
     )
 
     bpy.types.Scene.output_width = bpy.props.IntProperty(
@@ -100,6 +107,21 @@ def register_properties():
         default=True,
     )
 
+    # Depth/normal map export (rendered as compositor passes, then converted)
+    bpy.types.Scene.export_depth_maps = bpy.props.BoolProperty(
+        name="Depth Maps",
+        description="Also render depth maps (16-bit PNG in depths/) for depth-supervised training",
+        default=False,
+        update=_update_pass_outputs,
+    )
+
+    bpy.types.Scene.export_normal_maps = bpy.props.BoolProperty(
+        name="Normal Maps",
+        description="Also render camera-space normal maps (PNG in normals/) for normal-supervised training",
+        default=False,
+        update=_update_pass_outputs,
+    )
+
 
 def unregister_properties():
     """Unregister all scene properties"""
@@ -115,3 +137,5 @@ def unregister_properties():
     del bpy.types.Scene.pointcloud_stride
     del bpy.types.Scene.skip_interior_cameras
     del bpy.types.Scene.coordinate_system
+    del bpy.types.Scene.export_depth_maps
+    del bpy.types.Scene.export_normal_maps

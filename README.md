@@ -2,7 +2,7 @@
 
 > A powerful Blender add-on for Gaussian Splatting workflows. Generate your camera transforms and point clouds with ease!
 
-[![Blender Version](https://img.shields.io/badge/Blender-4.2.0%2B-orange.svg)](https://www.blender.org/)
+[![Blender Version](https://img.shields.io/badge/Blender-5.0.0%2B-orange.svg)](https://www.blender.org/)
 [![License](https://img.shields.io/badge/License-GPL_v3.0-blue.svg)](LICENSE)
 
 ![Interface Screenshot](gauss-cannon-screenshot.webp)
@@ -43,6 +43,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 - **Engine Selection**: Choose render engine with Cycles-specific device and persistent data options
 - **Native Render Window**: Opens Blender's render progress window with ESC-to-cancel
 - **Render Farm Ready**: The render output path is stored relative to the saved .blend, so farm nodes write frames to the same `images/` folder
+- **Depth & Normal Maps**: Optional exact depth and camera-space normal maps for depth/normal-supervised training in LichtFeld Studio and Spirula Studio
 
 ## User Interface
 - **Step-by-Step Workflow**: Clear Steps 1–4 guide you through the full pipeline
@@ -53,7 +54,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 
 # Requirements
 
-- **Blender**: 4.2.0 or higher
+- **Blender**: 5.0.0 or higher
 
 # Installation
 
@@ -121,6 +122,21 @@ To render on a farm instead, save the .blend and submit it. The output path is
 stored relative to the .blend (e.g. `//output/images/`) whenever the file is saved,
 as long as the output folder is on the same drive.
 
+### 7. Depth & Normal Maps (optional)
+```
+1. In Step 4, enable "Depth Maps" and/or "Normal Maps"
+2. Click "Render Animation": passes are saved as EXRs in _passes/, then
+   converted to depths/ and normals/ PNGs when the render finishes
+```
+
+The pass setup is saved in the .blend (view-layer passes plus compositor File
+Output nodes), so a render farm produces the `_passes/` EXRs without the add-on
+installed. After the farm finishes, click "Convert Depth/Normal Passes".
+Turning both toggles off removes the compositor nodes again.
+
+For depth supervision in LichtFeld Studio, the point cloud also needs to be dense
+enough (Ray Density 32+, Stride 1). The panel warns when it isn't.
+
 # Technical Details
 
 ## Camera JSON Export Formats
@@ -170,6 +186,27 @@ as long as the output folder is on the same drive.
 - **Properties**: x, y, z positions + RGB colors
 - **Coordinate System**: Configurable (Y-up or Z-up)
 - **Color Range**: 0-255 per channel
+
+## Depth & Normal Map Format
+Written next to `images/` with matching filenames, where both LichtFeld Studio and
+Spirula Studio look for them:
+
+| | `depths/0001.png` | `normals/0001.png` |
+|---|---|---|
+| Format | 1-channel 16-bit PNG | 3-channel 8-bit PNG |
+| Values | Planar z-depth × scale (one scale per scene) | Camera-space OpenCV axes (x right, y down, z forward), facing the camera, `round(127.5 + 127.5·n)` |
+| Invalid / background | `0` | `(128, 128, 128)` |
+
+`geometry_maps.json` records the depth scale (`depth = value / scale`, in Blender
+units) and the encodings. Both trainers treat depth as scale-invariant, so the
+scale only matters for your own tooling.
+
+Enabling them in the trainers:
+- **LichtFeld Studio**: `--use-depth-loss --use-normal-loss --normal-loss-space camera-opencv`.
+  The depth loss is fitted to the initial point cloud, so export a dense
+  `pointcloud.ply`. These losses are skipped with `--gut`.
+- **Spirula Studio**: normals are used automatically; set `depth_supervision_weight`
+  above 0 to use depth.
 
 ## Algorithm Details
 

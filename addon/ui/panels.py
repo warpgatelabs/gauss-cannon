@@ -114,6 +114,14 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
         col.scale_y = 1.3
         col.operator("export.pointcloud_ply", text="Generate Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
 
+        # LichtFeld Studio fits depth priors to the point cloud and needs
+        # 256+ points projecting into each camera, or skips depth supervision
+        if scene.export_depth_maps and (
+            scene.pointcloud_resolution < 32 or scene.pointcloud_stride > 1
+        ):
+            box.label(text="Too sparse for depth priors", icon="ERROR")
+            box.label(text="Use Ray Density 32+ and Stride 1")
+
         if selected_meshes:
             box.label(text=f"{len(selected_meshes)} mesh(es) selected", icon="CHECKMARK")
         else:
@@ -130,6 +138,20 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
             col.prop(scene.render, "use_persistent_data")
 
         col.separator()
+        row = col.row(align=True)
+        row.prop(scene, "export_depth_maps", toggle=True)
+        row.prop(scene, "export_normal_maps", toggle=True)
+        maps_enabled = scene.export_depth_maps or scene.export_normal_maps
+        if maps_enabled and scene.render.engine == "BLENDER_WORKBENCH":
+            col.label(text="Maps need Cycles or EEVEE", icon="ERROR")
+
+        col.separator()
         col.scale_y = 1.3
         col.operator("render.animation_to_export", text="Render Animation", icon="RENDER_ANIMATION")
+
+        if maps_enabled:
+            col = box.column(align=True)
+            col.operator("export.geometry_maps", text="Convert Depth/Normal Passes", icon="IMAGE_DATA")
+            box.label(text="Auto-runs after Render Animation", icon="INFO")
+            box.label(text="Run manually after farm renders")
 

@@ -13,6 +13,7 @@ from .operators import (
     RENDER_OT_animation_to_export,
     EXPORT_OT_camera_json,
     EXPORT_OT_pointcloud_ply,
+    EXPORT_OT_geometry_maps,
 )
 
 # Import UI panels
@@ -31,6 +32,7 @@ classes = [
     RENDER_OT_animation_to_export,
     EXPORT_OT_camera_json,
     EXPORT_OT_pointcloud_ply,
+    EXPORT_OT_geometry_maps,
 
     # UI panels
     VIEW3D_PT_helper_mesh_panel,

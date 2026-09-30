@@ -14,7 +14,7 @@ website = "https://github.com/warpgatelabs/gauss-cannon"
 # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
 tags = ["Import-Export", "Render"]
 
-blender_version_min = "4.2.0"
+blender_version_min = "5.0.0"
 
 # License conforming to https://spdx.org/licenses/ (use "SPDX: prefix)
 # https://docs.blender.org/manual/en/dev/advanced/extensions/licenses.html

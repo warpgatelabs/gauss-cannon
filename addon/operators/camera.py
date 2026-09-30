@@ -175,6 +175,34 @@ class CAMERA_OT_generate_from_faces(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def _remove_convert_handlers():
+    if _on_render_complete in bpy.app.handlers.render_complete:
+        bpy.app.handlers.render_complete.remove(_on_render_complete)
+    if _on_render_cancel in bpy.app.handlers.render_cancel:
+        bpy.app.handlers.render_cancel.remove(_on_render_cancel)
+
+
+def _on_render_complete(*args):
+    _remove_convert_handlers()
+    # Handlers can run off the main thread; convert from a timer instead
+    bpy.app.timers.register(_convert_passes_after_render, first_interval=0.1)
+
+
+def _on_render_cancel(*args):
+    # Frames rendered so far can still be converted from the panel
+    _remove_convert_handlers()
+
+
+def _convert_passes_after_render():
+    windows = bpy.context.window_manager.windows
+    if windows:
+        with bpy.context.temp_override(window=windows[0]):
+            bpy.ops.export.geometry_maps()
+    else:
+        bpy.ops.export.geometry_maps()
+    return None
+
+
 class RENDER_OT_animation_to_export(bpy.types.Operator):
     """Render animation to the export output folder"""
 
@@ -199,7 +227,18 @@ class RENDER_OT_animation_to_export(bpy.types.Operator):
         if not os.path.exists(images_dir):
             os.makedirs(images_dir)
 
+        maps_enabled = scene.export_depth_maps or scene.export_normal_maps
+        if maps_enabled and scene.render.engine == "BLENDER_WORKBENCH":
+            self.report({"ERROR"}, "Depth/normal maps need Cycles or EEVEE")
+            return {"CANCELLED"}
+
         sync_render_outputs(scene)
+
+        if maps_enabled:
+            # Convert the EXR passes to PNGs once the whole animation is done
+            _remove_convert_handlers()
+            bpy.app.handlers.render_complete.append(_on_render_complete)
+            bpy.app.handlers.render_cancel.append(_on_render_cancel)
 
         # INVOKE_DEFAULT opens the render window with progress, like Render > Render Animation
         bpy.ops.render.render('INVOKE_DEFAULT', animation=True)

@@ -2,8 +2,9 @@ import bpy
 import os
 import json
 import numpy as np
-from mathutils import Matrix, Vector, Euler
+from mathutils import Vector
 from ..utils.coordinate_systems import convert_coordinate_system
+from ..utils.camera_eval import angle_based_intrinsics, build_fast_path_evaluator
 
 
 class EXPORT_OT_camera_json(bpy.types.Operator):
@@ -51,108 +52,6 @@ class EXPORT_OT_camera_json(bpy.types.Operator):
 
         return float(np.max(bbox_size))
 
-    def iter_action_fcurves(self, animation_data):
-        """
-        Yield F-curves from animation_data, working across Blender versions.
-
-        Pre-4.4: F-curves live directly on Action.fcurves.
-        4.4+ (Slotted Actions): F-curves live in Channelbags inside Strips
-        inside Layers, keyed by the animation_data's action_slot.
-        """
-        if not animation_data or not animation_data.action:
-            return
-        action = animation_data.action
-
-        legacy = getattr(action, "fcurves", None)
-        if legacy is not None:
-            for fc in legacy:
-                yield fc
-            return
-
-        slot = getattr(animation_data, "action_slot", None)
-        for layer in getattr(action, "layers", []):
-            for strip in getattr(layer, "strips", []):
-                cb = None
-                if slot is not None and hasattr(strip, "channelbag"):
-                    try:
-                        cb = strip.channelbag(slot)
-                    except Exception:
-                        cb = None
-                if cb is None:
-                    # No slot match — fall back to any channelbags on the strip
-                    for cb_alt in getattr(strip, "channelbags", []):
-                        for fc in cb_alt.fcurves:
-                            yield fc
-                    continue
-                for fc in cb.fcurves:
-                    yield fc
-
-    def build_fast_path_evaluator(self, camera):
-        """
-        Build a frame -> world-matrix evaluator that bypasses scene.frame_set.
-
-        Reads keyframe values directly from the camera's location/rotation_euler
-        F-curves so we don't trigger a full depsgraph evaluation for every frame
-        (which is slow when the scene has rigged characters, simulations, etc.).
-
-        Returns a callable on success, or None when the camera transform can't
-        be reconstructed in isolation — caller should then fall back to
-        scene.frame_set + camera.matrix_world.
-        """
-        # Anything that makes matrix_world depend on more than the camera's own
-        # local transform forces the slow path.
-        if camera.parent is not None:
-            return None
-        if len(camera.constraints) > 0:
-            return None
-        if camera.rotation_mode != "XYZ":
-            return None
-        cam_anim = camera.data.animation_data
-        if cam_anim and any(True for _ in self.iter_action_fcurves(cam_anim)):
-            # Animated intrinsics (lens, sensor, clip): we'd need depsgraph eval
-            return None
-        if not camera.animation_data or not camera.animation_data.action:
-            return None
-
-        needed = {
-            ("location", 0): None,
-            ("location", 1): None,
-            ("location", 2): None,
-            ("rotation_euler", 0): None,
-            ("rotation_euler", 1): None,
-            ("rotation_euler", 2): None,
-        }
-        for fc in self.iter_action_fcurves(camera.animation_data):
-            key = (fc.data_path, fc.array_index)
-            if key in needed:
-                needed[key] = fc
-        if any(fc is None for fc in needed.values()):
-            return None
-
-        def to_dict(fc):
-            return {int(round(kp.co.x)): kp.co.y for kp in fc.keyframe_points}
-
-        loc_maps = [to_dict(needed[("location", i)]) for i in range(3)]
-        rot_maps = [to_dict(needed[("rotation_euler", i)]) for i in range(3)]
-
-        scale_mat = Matrix.Diagonal(camera.scale).to_4x4()
-
-        def evaluate(frame_idx):
-            try:
-                loc = Vector(
-                    (loc_maps[0][frame_idx], loc_maps[1][frame_idx], loc_maps[2][frame_idx])
-                )
-                rot = Euler(
-                    (rot_maps[0][frame_idx], rot_maps[1][frame_idx], rot_maps[2][frame_idx]),
-                    "XYZ",
-                )
-            except KeyError:
-                # Frame missing from keyframes for any channel; let caller fall back.
-                return None
-            return Matrix.Translation(loc) @ rot.to_matrix().to_4x4() @ scale_mat
-
-        return evaluate
-
     def extract_camera_parameters(self, camera_obj, render_settings, coordinate_system, export_mode=None, world_matrix=None):
         """Extract camera parameters with optimizations"""
         cam_data = camera_obj.data
@@ -167,24 +66,7 @@ class EXPORT_OT_camera_json(bpy.types.Operator):
         # Field of view calculation and focal lengths
         if export_mode in ("LICHTFELD", "BRUSH"):
             # For LichtFeld Studio, use Blender's actual FOV directly
-            # Blender's cam_data.angle is the FOV in radians
-            if cam_data.sensor_fit == 'HORIZONTAL' or (cam_data.sensor_fit == 'AUTO' and render_w >= render_h):
-                # Horizontal FOV is the reference
-                fov_x = cam_data.angle
-                # Calculate vertical FOV from horizontal
-                aspect_ratio = render_h / render_w
-                fov_y = 2.0 * np.arctan(np.tan(fov_x / 2.0) * aspect_ratio)
-            else:
-                # Vertical FOV is the reference
-                fov_y = cam_data.angle
-                # Calculate horizontal FOV from vertical
-                aspect_ratio = render_w / render_h
-                fov_x = 2.0 * np.arctan(np.tan(fov_y / 2.0) * aspect_ratio)
-
-            # Calculate focal lengths to match LichtFeld's expectation
-            # LichtFeld uses: focal = 0.5 * resolution / tan(0.5 * fov_rad)
-            fx = 0.5 * render_w / np.tan(0.5 * fov_x)
-            fy = 0.5 * render_h / np.tan(0.5 * fov_y)
+            fx, fy, fov_x, fov_y = angle_based_intrinsics(cam_data, render_w, render_h)
         else:
             # Standard calculation from sensor dimensions
             # Pixel-space focal lengths
@@ -267,7 +149,7 @@ class EXPORT_OT_camera_json(bpy.types.Operator):
 
         # Try to build a fast-path evaluator that reads camera transforms directly
         # from F-curve keyframe data, bypassing per-frame depsgraph evaluation.
-        fast_eval = self.build_fast_path_evaluator(camera)
+        fast_eval = build_fast_path_evaluator(camera)
         slow_path_frames = 0
 
         # Get initial camera parameters
