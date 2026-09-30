@@ -77,6 +77,10 @@ class MESH_OT_clear_helpers(bpy.types.Operator):
     bl_label = "Clear All"
     bl_options = {"REGISTER", "UNDO"}
 
+    @classmethod
+    def poll(cls, context):
+        return len(context.scene.helper_meshes) > 0
+
     def execute(self, context):
         scene = context.scene
 

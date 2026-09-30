@@ -11,8 +11,10 @@ from .operators import (
     MESH_OT_clear_helpers,
     CAMERA_OT_generate_from_faces,
     RENDER_OT_animation_to_export,
-    EXPORT_OT_camera_json,
+    EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
+    EXPORT_OT_geometry_maps,
+    EXPORT_OT_geometry_maps_cancel,
 )
 
 # Import UI panels
@@ -29,8 +31,10 @@ classes = [
     MESH_OT_clear_helpers,
     CAMERA_OT_generate_from_faces,
     RENDER_OT_animation_to_export,
-    EXPORT_OT_camera_json,
+    EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
+    EXPORT_OT_geometry_maps,
+    EXPORT_OT_geometry_maps_cancel,
 
     # UI panels
     VIEW3D_PT_helper_mesh_panel,

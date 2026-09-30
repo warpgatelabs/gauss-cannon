@@ -1,4 +1,5 @@
 import bpy
+from .utils.output_paths import sync_pass_outputs
 
 
 class HelperMeshItem(bpy.types.PropertyGroup):
@@ -11,6 +12,11 @@ class HelperMeshItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
 
 
+def _update_pass_outputs(self, context):
+    """Keep the compositor depth/normal outputs in step with the settings."""
+    sync_pass_outputs(self)
+
+
 def register_properties():
     """Register all scene properties"""
     # Helper mesh collection
@@ -20,9 +26,10 @@ def register_properties():
     # Shared output folder
     bpy.types.Scene.output_folder = bpy.props.StringProperty(
         name="Output Folder",
-        description="Folder for all exports (transforms.json, pointcloud.ply, images/)",
+        description="Folder for all exports (sparse/0/, pointcloud.ply, images/)",
         default="",
         subtype="DIR_PATH",
+        update=_update_pass_outputs,
     )
 
     bpy.types.Scene.output_width = bpy.props.IntProperty(
@@ -42,39 +49,19 @@ def register_properties():
     )
 
     bpy.types.Scene.camera_focal_length = bpy.props.FloatProperty(
-        name="Focal Length (mm)",
-        description="Camera lens focal length",
+        name="Focal Length",
+        description="Camera lens focal length in millimeters",
         default=35.0,
         min=1.0,
         max=500.0,
         precision=1,
-    )
-
-    bpy.types.Scene.export_mode = bpy.props.EnumProperty(
-        name="Export Mode",
-        description="Choose export format compatibility",
-        items=[
-            ("LICHTFELD", "LichtFeld Studio", "Compatible with LichtFeld Studio"),
-            ("POSTSHOT", "Postshot", "Compatible with Postshot"),
-            ("BRUSH", "Brush", "Compatible with Brush"),
-        ],
-        default="LICHTFELD",
+        subtype="DISTANCE_CAMERA",
     )
 
     bpy.types.Scene.skip_interior_cameras = bpy.props.BoolProperty(
         name="Skip Interior Cameras",
         description="Skip camera positions detected to be inside meshes using ray casting",
         default=False,
-    )
-
-    bpy.types.Scene.coordinate_system = bpy.props.EnumProperty(
-        name="Coordinate System",
-        description="Output coordinate system for transforms and point cloud",
-        items=[
-            ("Y_UP", "Y-up", "Y-up coordinate system (Standard for most applications)"),
-            ("Z_UP", "Z-up", "Z-up coordinate system (Blender native)")
-        ],
-        default="Y_UP",
     )
 
     # Point cloud export settings
@@ -100,6 +87,21 @@ def register_properties():
         default=True,
     )
 
+    # Depth/normal map export (rendered as compositor passes, then converted)
+    bpy.types.Scene.export_depth_maps = bpy.props.BoolProperty(
+        name="Depth Maps",
+        description="Also render depth maps (16-bit PNG in depths/) for depth-supervised training. Adds a depth pass output to the scene's compositor",
+        default=False,
+        update=_update_pass_outputs,
+    )
+
+    bpy.types.Scene.export_normal_maps = bpy.props.BoolProperty(
+        name="Normal Maps",
+        description="Also render camera-space normal maps (PNG in normals/) for normal-supervised training. Adds a normal pass output to the scene's compositor",
+        default=False,
+        update=_update_pass_outputs,
+    )
+
 
 def unregister_properties():
     """Unregister all scene properties"""
@@ -109,9 +111,9 @@ def unregister_properties():
     del bpy.types.Scene.output_width
     del bpy.types.Scene.output_height
     del bpy.types.Scene.camera_focal_length
-    del bpy.types.Scene.export_mode
     del bpy.types.Scene.pointcloud_resolution
     del bpy.types.Scene.use_gpu_acceleration
     del bpy.types.Scene.pointcloud_stride
     del bpy.types.Scene.skip_interior_cameras
-    del bpy.types.Scene.coordinate_system
+    del bpy.types.Scene.export_depth_maps
+    del bpy.types.Scene.export_normal_maps

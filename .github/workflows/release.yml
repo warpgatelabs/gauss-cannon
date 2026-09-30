@@ -91,7 +91,7 @@ jobs:
 
           ## Requirements
 
-          - Blender 4.2.0 or higher
+          - Blender 5.0.0 or higher
           - GPU support recommended for point cloud generation
         files: ./gauss-cannon-${{ steps.version.outputs.TAG }}.zip
         draft: false
