@@ -3,7 +3,7 @@ from ..operators.export_geometry_maps import conversion_progress
 from ..operators.export_pointcloud import scannable_meshes
 
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # Below this many rays per frame the point cloud is too sparse for depth
 # priors (LichtFeld Studio skips depth supervision for cameras with too few
