@@ -26,6 +26,10 @@ _MIN_NORMAL_LENGTH = 0.9
 
 INVALID_NORMAL = 128
 
+# zlib level 1 writes these maps several times faster than the default (6)
+# for files only a few percent larger.
+_PNG_COMPRESSION_LEVEL = 1
+
 
 def scan_pass_frames(passes_dir, subfolders=("depth", "normal")):
     """
@@ -67,11 +71,13 @@ def write_png(path, pixels):
     height, width = pixels.shape[:2]
     channels = 1 if pixels.ndim == 2 else pixels.shape[2]
     fmt = oiio.UINT16 if pixels.dtype == np.uint16 else oiio.UINT8
+    spec = oiio.ImageSpec(width, height, channels, fmt)
+    spec.attribute("png:compressionLevel", _PNG_COMPRESSION_LEVEL)
     out = oiio.ImageOutput.create(path)
     if out is None:
         raise OSError(f"Cannot create {path}: {oiio.geterror()}")
     try:
-        if not out.open(path, oiio.ImageSpec(width, height, channels, fmt)):
+        if not out.open(path, spec):
             raise OSError(f"Cannot open {path}: {out.geterror()}")
         if not out.write_image(pixels.reshape(height, width, channels)):
             raise OSError(f"Cannot write {path}: {out.geterror()}")

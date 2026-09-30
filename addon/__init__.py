@@ -14,6 +14,7 @@ from .operators import (
     EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
     EXPORT_OT_geometry_maps,
+    EXPORT_OT_geometry_maps_cancel,
 )
 
 # Import UI panels
@@ -33,6 +34,7 @@ classes = [
     EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
     EXPORT_OT_geometry_maps,
+    EXPORT_OT_geometry_maps_cancel,
 
     # UI panels
     VIEW3D_PT_helper_mesh_panel,

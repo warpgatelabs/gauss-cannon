@@ -1,4 +1,5 @@
 import bpy
+from ..operators.export_geometry_maps import conversion_progress
 
 
 VERSION = "1.2.0"
@@ -146,7 +147,13 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
         col.scale_y = 1.3
         col.operator("render.animation_to_export", text="Render Animation", icon="RENDER_ANIMATION")
 
-        if maps_enabled:
+        progress = conversion_progress()
+        if progress is not None:
+            fraction, label = progress
+            row = box.row(align=True)
+            row.progress(factor=fraction, type="BAR", text=label)
+            row.operator("export.geometry_maps_cancel", text="", icon="X")
+        elif maps_enabled:
             col = box.column(align=True)
             col.operator("export.geometry_maps", text="Convert Depth/Normal Passes", icon="IMAGE_DATA")
             box.label(text="Auto-runs after Render Animation", icon="INFO")

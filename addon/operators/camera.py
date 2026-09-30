@@ -7,6 +7,7 @@ from ..utils.ray_casting import (
     build_visible_mesh_bvh_cache,
 )
 from ..utils.output_paths import sync_render_outputs
+from .export_geometry_maps import conversion_progress
 
 
 class CAMERA_OT_generate_from_faces(bpy.types.Operator):
@@ -196,8 +197,9 @@ def _on_render_cancel(*args):
 def _convert_passes_after_render():
     windows = bpy.context.window_manager.windows
     if windows:
+        # Invoke to convert in the background with progress in the UI
         with bpy.context.temp_override(window=windows[0]):
-            bpy.ops.export.geometry_maps()
+            bpy.ops.export.geometry_maps("INVOKE_DEFAULT")
     else:
         bpy.ops.export.geometry_maps()
     return None
@@ -216,6 +218,8 @@ class RENDER_OT_animation_to_export(bpy.types.Operator):
             context.scene.camera
             and context.scene.frame_end >= context.scene.frame_start
             and context.scene.output_folder.strip()
+            # A new render would overwrite the passes being converted
+            and conversion_progress() is None
         )
 
     def execute(self, context):
