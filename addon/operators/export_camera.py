@@ -3,7 +3,8 @@ import os
 import json
 import numpy as np
 from mathutils import Vector
-from ..utils.coordinate_systems import convert_coordinate_system
+from ..utils.coordinate_systems import convert_coordinate_system, output_coordinate_system
+from ..utils.output_paths import render_image_extension
 from ..utils.camera_eval import angle_based_intrinsics, build_fast_path_evaluator
 
 
@@ -96,24 +97,9 @@ class EXPORT_OT_camera_json(bpy.types.Operator):
             "transform": transform,
         }
 
-    def get_render_extension(self):
-        """Get file extension based on Blender's render output format"""
-        format_map = {
-            'PNG': '.png',
-            'JPEG': '.jpg',
-            'OPEN_EXR': '.exr',
-            'OPEN_EXR_MULTILAYER': '.exr',
-            'TIFF': '.tif',
-            'BMP': '.bmp',
-            'HDR': '.hdr',
-            'WEBP': '.webp',
-        }
-        file_format = bpy.context.scene.render.image_settings.file_format
-        return format_map.get(file_format, '.png')
-
     def generate_frame_data(self, frame_idx, cam_params, simplified=False):
         """Generate frame data entry"""
-        ext = self.get_render_extension()
+        ext = render_image_extension(bpy.context.scene)
         frame_entry = {
             "transform_matrix": cam_params["transform"],
             "file_path": f"images/{frame_idx:04d}{ext}",
@@ -144,8 +130,7 @@ class EXPORT_OT_camera_json(bpy.types.Operator):
         # Calculate scene bounds
         scene_scale = self.compute_scene_bounds()
 
-        # Brush uses LichtFeld's JSON layout but Z-up coordinates
-        coordinate_system = "Z_UP" if scene.export_mode == "BRUSH" else scene.coordinate_system
+        coordinate_system = output_coordinate_system(scene)
 
         # Try to build a fast-path evaluator that reads camera transforms directly
         # from F-curve keyframe data, bypassing per-frame depsgraph evaluation.

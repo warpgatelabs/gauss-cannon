@@ -26,7 +26,7 @@ def register_properties():
     # Shared output folder
     bpy.types.Scene.output_folder = bpy.props.StringProperty(
         name="Output Folder",
-        description="Folder for all exports (transforms.json, pointcloud.ply, images/)",
+        description="Folder for all exports (transforms.json or sparse/0/, pointcloud.ply, images/)",
         default="",
         subtype="DIR_PATH",
         update=_update_pass_outputs,
@@ -64,6 +64,7 @@ def register_properties():
             ("LICHTFELD", "LichtFeld Studio", "Compatible with LichtFeld Studio"),
             ("POSTSHOT", "Postshot", "Compatible with Postshot"),
             ("BRUSH", "Brush", "Compatible with Brush"),
+            ("COLMAP", "COLMAP", "COLMAP binary sparse model (sparse/0/*.bin), read by most Gaussian Splatting trainers"),
         ],
         default="LICHTFELD",
     )

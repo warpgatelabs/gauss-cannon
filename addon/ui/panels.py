@@ -67,7 +67,8 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
         col = box.column(align=True)
         col.prop(scene, "output_folder")
         col.prop(scene, "export_mode")
-        if scene.export_mode != "BRUSH":
+        # Brush and COLMAP always use Blender's Z-up frame
+        if scene.export_mode not in ("BRUSH", "COLMAP"):
             col.prop(scene, "coordinate_system")
 
         if not scene.output_folder.strip():
@@ -95,7 +96,10 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
 
         col = box.column(align=True)
         col.scale_y = 1.3
-        col.operator("export.camera_json", text="Export Camera JSON", icon="FILE_TEXT")
+        if scene.export_mode == "COLMAP":
+            col.operator("export.colmap", text="Export COLMAP Model", icon="FILE_3D")
+        else:
+            col.operator("export.camera_json", text="Export Camera JSON", icon="FILE_TEXT")
 
         # Step 3: Point Cloud
         box = layout.box()
@@ -113,6 +117,9 @@ class VIEW3D_PT_helper_mesh_panel(bpy.types.Panel):
         col.separator()
         col.scale_y = 1.3
         col.operator("export.pointcloud_ply", text="Generate Point Cloud", icon="OUTLINER_OB_POINTCLOUD")
+
+        if scene.export_mode == "COLMAP":
+            box.label(text="Also writes points3D.bin", icon="INFO")
 
         # LichtFeld Studio fits depth priors to the point cloud and needs
         # 256+ points projecting into each camera, or skips depth supervision

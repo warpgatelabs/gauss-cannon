@@ -12,6 +12,7 @@ from .operators import (
     CAMERA_OT_generate_from_faces,
     RENDER_OT_animation_to_export,
     EXPORT_OT_camera_json,
+    EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
     EXPORT_OT_geometry_maps,
 )
@@ -31,6 +32,7 @@ classes = [
     CAMERA_OT_generate_from_faces,
     RENDER_OT_animation_to_export,
     EXPORT_OT_camera_json,
+    EXPORT_OT_colmap,
     EXPORT_OT_pointcloud_ply,
     EXPORT_OT_geometry_maps,
 

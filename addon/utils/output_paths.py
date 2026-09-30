@@ -40,6 +40,21 @@ def images_render_path(scene, blend_path=None):
     )
 
 
+def render_image_extension(scene):
+    """File extension of rendered frames, from the render output format."""
+    format_map = {
+        'PNG': '.png',
+        'JPEG': '.jpg',
+        'OPEN_EXR': '.exr',
+        'OPEN_EXR_MULTILAYER': '.exr',
+        'TIFF': '.tif',
+        'BMP': '.bmp',
+        'HDR': '.hdr',
+        'WEBP': '.webp',
+    }
+    return format_map.get(scene.render.image_settings.file_format, '.png')
+
+
 def sync_render_outputs(scene, blend_path=None):
     """Point the scene's render output at <output_folder>/images/ and the
     depth/normal pass outputs at <output_folder>/_passes/."""

@@ -26,6 +26,8 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 - **Multi-Format Camera Export**:
   - LichtFeld Studio compatible format (default)
   - Postshot compatible simplified format
+  - Brush compatible format (Z-up)
+  - COLMAP binary sparse model (`sparse/0/*.bin`), read by most Gaussian Splatting trainers
 - **Camera Parameters**: Exports full intrinsics and extrinsics with 4x4 transform matrices
 - **Scene Normalization**: Automatic AABB scale calculation for consistent processing
 - **Coordinate System Options**: Support for both Y-up and Z-up coordinate systems
@@ -47,7 +49,7 @@ Created/Maintained by [Arash Keshmirian](https://github.com/keshmirian)
 
 ## User Interface
 - **Step-by-Step Workflow**: Clear Steps 1–4 guide you through the full pipeline
-- **Unified Output Folder**: Single folder for all exports (`transforms.json`, `pointcloud.ply`, `images/`)
+- **Unified Output Folder**: Single folder for all exports (`transforms.json` or `sparse/0/`, `pointcloud.ply`, `images/`)
 - **Integrated Panel**: Clean UI in the 3D viewport's N-panel under "Gauss Cannon" tab
 - **Real-time Feedback**: Shows face counts, camera positions, and selected objects
 - **Visual Status Indicators**: Icons show mesh visibility and selection status
@@ -81,8 +83,8 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 ### 2. Configure Output
 ```
 1. Set the output folder (all exports go here)
-2. Choose export mode (LichtFeld Studio or Postshot)
-3. Select coordinate system (Y-up or Z-up)
+2. Choose export mode (LichtFeld Studio, Postshot, Brush or COLMAP)
+3. Select coordinate system (Y-up or Z-up; Brush and COLMAP always use Z-up)
 ```
 
 ### 3. Generate Camera Path (Step 1)
@@ -95,9 +97,13 @@ To uninstall or update later, find Gauss Cannon under `Edit > Preferences > Get 
 
 ### 4. Export Camera Data
 ```
-1. Click "Export Camera JSON"
-2. transforms.json is saved to your output folder
+1. Click "Export Camera JSON" (or "Export COLMAP Model" in COLMAP mode)
+2. transforms.json (or sparse/0/cameras.bin and images.bin) is saved to your output folder
 ```
+
+In COLMAP mode, "Generate Point Cloud" also writes `sparse/0/points3D.bin`, which
+trainers use to initialize the splats. Until then, the camera export leaves an empty
+`points3D.bin` so the model is always loadable.
 
 ### 5. Generate Point Cloud
 ```
@@ -180,6 +186,13 @@ enough (Ray Density 32+, Stride 1). The panel warns when it isn't.
   ]
 }
 ```
+
+## COLMAP Sparse Model
+Written to `sparse/0/` in COLMAP's binary format, next to `images/`:
+- **cameras.bin**: `PINHOLE` model (`fx, fy, cx, cy`) at the rendered image size, including the render resolution percentage. There is one camera unless the lens is animated.
+- **images.bin**: world-to-camera poses with OpenCV camera axes (x right, y down, z forward), one per rendered frame (respecting frame step), named like the rendered images (`0001.png`). There are no 2D observations.
+- **points3D.bin**: the generated point cloud with empty tracks, which trainers accept because they only read positions and colors.
+- **Coordinate System**: Blender's world frame (Z-up) for both cameras and points. COLMAP has no fixed up axis, and trainers orient the scene themselves.
 
 ## Point Cloud PLY Format
 - **Format**: Binary little-endian PLY

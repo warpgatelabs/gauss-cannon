@@ -44,6 +44,18 @@ def convert_coordinate_system(coordinate_system, transform_matrix=None, point=No
         return [point[0], point[1], point[2]]
 
 
+def output_coordinate_system(scene):
+    """
+    Coordinate system for exported cameras and points.
+
+    Brush reads LichtFeld's JSON layout in Z-up. COLMAP models stay in
+    Blender's frame, which keeps cameras and points in one shared frame.
+    """
+    if scene.export_mode in ("BRUSH", "COLMAP"):
+        return "Z_UP"
+    return scene.coordinate_system
+
+
 def write_ply_header(num_points):
     """Generate PLY file header for colored point cloud"""
     return f"""ply
